@@ -54,6 +54,21 @@ func CreateTables(db *sql.DB) error {
 		return err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS comments (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			content TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			post_id INTEGER,
+			author_id INTEGER,
+			FOREIGN KEY (post_id) REFERENCES posts(id),
+			FOREIGN KEY (author_id) REFERENCES users(id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Create the 'followers' table
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS followers (

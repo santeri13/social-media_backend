@@ -3,6 +3,8 @@ package mainpage
 import (
 	"database/sql"
 	"log"
+	"errors"
+	"sort"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -61,7 +63,7 @@ func CommentCreation(commentData structure.Comment) {
 	log.Println("Comment is created:", commentData.Content)
 }
 
-func getPostsFromDatabase(postCounter int) structure.Post {
+func GetPostsFromDatabase() []structure.Post {
 	// Open a connection to the SQLite database
 	db, err := sql.Open("sqlite3", "./forum.db")
 	if err != nil {
@@ -70,22 +72,16 @@ func getPostsFromDatabase(postCounter int) structure.Post {
 	defer db.Close()
 	// Retrieve all posts from the database
 	rows, err := db.Query(`
-		SELECT p.id, p.author_id, p.title, p.content, p.category, c.id, c.author_id, c.content
+		SELECT p.id, p.user_id, p.title, p.content, p.category, c.id, c.author_id, c.content
 		FROM posts p
 		LEFT JOIN comments c ON c.post_id = p.id ORDER BY p.id
 	`)
-	if postCounter > 0 {
-		rows, err = db.Query(`
-		SELECT p.id, p.author_id, p.title, p.content, p.category, c.id, c.author_id, c.content
-		FROM posts p
-		LEFT JOIN comments c ON c.post_id = p.id ORDER BY p.id DESC LIMIT 1`)
-	}
 	if err != nil {
 		log.Println(err)
 	}
 	defer rows.Close()
 	// Map to store posts and their comments
-	postsMap := make(map[string]*structure.Post)
+	postsMap := make(map[int]*structure.Post)
 	// Iterate over the rows and populate the postsMap
 	for rows.Next() {
 		var postID, commentID int
@@ -106,7 +102,7 @@ func getPostsFromDatabase(postCounter int) structure.Post {
 		post, ok := postsMap[postID]
 		if !ok {
 			// Create a new post if it doesn't exist
-			post = &Post{
+			post = &structure.Post{
 				ID:       postID,
 				UserID:   postUserID,
 				Title:    postTitle,
@@ -126,7 +122,7 @@ func getPostsFromDatabase(postCounter int) structure.Post {
 		}
 		// Append the comment to the post's comments slice
 		if commentID != 0 {
-			comment := Comment{
+			comment := structure.Comment{
 				ID:      commentID,
 				UserID:  commentUserID,
 				Content: commentContent,
@@ -136,7 +132,7 @@ func getPostsFromDatabase(postCounter int) structure.Post {
 		}
 	}
 	// Collect the posts from the map
-	posts := make(*structure.Post, 0, len(postsMap))
+	posts := make([]structure.Post, 0, len(postsMap))
 	for _, post := range postsMap {
 		posts = append(posts, *post)
 	}
@@ -146,4 +142,15 @@ func getPostsFromDatabase(postCounter int) structure.Post {
 	}
 	sort.Sort(employeeList(posts))
 	return posts
+}
+
+type employeeList []structure.Post
+func (e employeeList) Len() int {
+	return len(e)
+}
+func (e employeeList) Less(i, j int) bool {
+	return e[i].ID < e[j].ID
+}
+func (e employeeList) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
 }

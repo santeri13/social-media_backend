@@ -88,8 +88,20 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Content:  	message.Content,
 					Category:   message.Category,
 				}
+				log.Println(post)
 				mainpage.PostCreation(post)
-
+			case "comment":
+				var message structure.Comment
+				err = json.Unmarshal(msg, &message)
+				comment := structure.Comment{
+					UserID:		message.UserID,
+					Content:	message.Content,
+					PostID:  	message.PostID,
+				}
+				log.Println(comment)
+				mainpage.CommentCreation(comment)
+			case "posts":
+				sendPosts(conn,mainpage.GetPostsFromDatabase())
 			case "change":
 				var message structure.UserData
 				err = json.Unmarshal(msg, &message)
@@ -147,8 +159,16 @@ func sendMessage(conn *websocket.Conn, message string) {
 	}
 }
 
-// Function to send a message back to the sender
 func sendUserData(conn *websocket.Conn, message structure.UserData) {
+	fmt.Println(message)
+	err := conn.WriteJSON(message)
+	if err != nil {
+		log.Println("Failed to send message:", err)
+	}
+}
+
+// Function to send a message back to the sender
+func sendPosts(conn *websocket.Conn, message []structure.Post) {
 	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {

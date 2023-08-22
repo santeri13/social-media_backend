@@ -22,21 +22,21 @@ type Message struct {
 }
 
 type Post struct {
-	ID       int       `json:"id"`
-	UserID   string    `json:"uuid"`
-	Title    string    `json:"title"`
-	Content  string    `json:"content"`
-	Category string    `json:"category"`
-	Nickname string		`json:"nickname"`
-	Comments []Comment `json:"comments"`
+	ID       int       
+	UserID   string    
+	Title    string    
+	Content  string   
+	Category string    
+	Nickname string		
+	Comments []Comment
 }
 
 type Comment struct {
-	ID      int    `json:"id"`
-	UserID  string `json:"uuid"`
-	Content string `json:"content"`
-	PostID  string `json:"post_id"`
-	Nickname string `json:"nickname"`
+	ID      int    
+	UserID  string 
+	Content string 
+	PostID  int 
+	Nickname string
 }
 
 type UserData struct {
