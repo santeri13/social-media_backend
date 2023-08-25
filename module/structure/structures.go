@@ -41,10 +41,25 @@ type Comment struct {
 
 type UserData struct {
 	UserID    string `json: "userid"`
+	UUID      string `json:"user_uuid"`
 	Nickname  string `json: "nickname"`
     FirstName string `json: "firstname"`
     LastName  string `json: "lastname"`
     Age       int 	 `json: "age"`
     Gender    string `json: "gender"`
     Email     string `json: "email"`
+	Activity  string `json:"activity"`
+}
+
+type PrivateMessages struct {
+	Content  string 
+	Time     string 
+	SenderId string 
+	RecipientId string 
+}
+
+type PrivateMesssageSend struct {
+	UserID   string 
+	Nickname string 
+	Content  string 
 }

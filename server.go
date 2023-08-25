@@ -13,11 +13,12 @@ import (
 	"social-network/module/structure"
 	"social-network/module/pages/mainpage"
 	"social-network/module/pages/cabinetpage"
-    
+	"social-network/module/pages/privatemessagepage"
 )
 
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan structure.Message)
+var onlineUsers = make(map[string]*websocket.Conn)
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -31,7 +32,18 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error upgrading connection:", err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		// Remove the client from the map of connected clients
+		delete(clients, conn)
+		// Delete the user from the onlineUsers map
+		for uuid, c := range onlineUsers {
+			if c == conn {
+				delete(onlineUsers, uuid)
+				break
+			}
+		}
+	}()
 
 	// Add the new client to the map of connected clients
 	clients[conn] = true
@@ -42,6 +54,7 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 			log.Println("WebSocket read error:", err)
 			// Remove the client from the map of connected clients if there's an error
 			delete(clients, conn)
+
 			break
 		}
 
@@ -61,8 +74,11 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Password:  	message.Password,
 				}
 				userID := database.LoginUser(loginData)
+				if userID != "" {
+					// Add the user to the online users map
+					onlineUsers[userID] = conn
+				}
 				sendMessage(conn, userID)
-
 			case "register":
 				var message structure.RegistrationData
 				err = json.Unmarshal(msg, &message)
@@ -75,10 +91,27 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Email:     	message.Email, 
 					Password:  	message.Password,
 				}
-				fmt.Println(regData)
 				userID := database.RegisterUser(regData)
+				if userID != "" {
+					onlineUsers[userID] = conn
+				}
 				sendMessage(conn, userID)
-
+			case "log_out":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				pageData := structure.Message{
+					UUID: message.UUID,
+				}
+				delete(onlineUsers, uuid)
+			case "addUserToConnection":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				pageData := structure.Message{
+					UUID: message.UUID,
+				}
+				if pageData.UUID != "" {
+					onlineUsers[pageData.UUID] = conn
+				}
 			case "post":
 				var message structure.Post
 				err = json.Unmarshal(msg, &message)
@@ -115,6 +148,35 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Email:     	message.Email, 
 				}
 				cabinetpage.UpdateUserData(userData)
+			case "userlist":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				pageData := structure.Message{
+					UUID: message.UUID,
+				}
+
+				log.Println(pageData)
+				// Get the list of users from the database
+				users := privatemessage.GetUsers(pageData.UUID)
+				// Iterate through the list of users and check if they are online
+				for i := range users {
+					if _, ok := onlineUsers[users[i].UserID]; ok {
+						users[i].Activity = "online"
+					} else {
+						users[i].Activity = "offline"
+					}
+				}
+				
+				sendUsersData(conn, users)
+			case "user_uuid":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				userUUIDData := structure.Message{
+					UUID: message.UUID,
+				}
+			case "showmessage":
+				
+				sendMessage(conn, userUUIDData.UUID)
 			case "cabinet":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -148,6 +210,8 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				sendUserData(conn, userData)
 		}
+		log.Println(onlineUsers)
+		log.Println(clients)
     }
 }
 
@@ -166,6 +230,15 @@ func sendUserData(conn *websocket.Conn, message structure.UserData) {
 		log.Println("Failed to send message:", err)
 	}
 }
+
+func sendUsersData(conn *websocket.Conn, message []structure.UserData) {
+	fmt.Println(message)
+	err := conn.WriteJSON(message)
+	if err != nil {
+		log.Println("Failed to send message:", err)
+	}
+}
+
 
 // Function to send a message back to the sender
 func sendPosts(conn *websocket.Conn, message []structure.Post) {
