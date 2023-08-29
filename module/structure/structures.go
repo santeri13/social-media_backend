@@ -49,6 +49,7 @@ type UserData struct {
     Gender    string `json: "gender"`
     Email     string `json: "email"`
 	Activity  string `json:"activity"`
+
 }
 
 type PrivateMessages struct {
@@ -62,4 +63,10 @@ type PrivateMesssageSend struct {
 	UserID   string 
 	Nickname string 
 	Content  string 
+}
+
+type UserMessageData struct {
+	UserID   string
+	Nickname string
+	Offset   int
 }

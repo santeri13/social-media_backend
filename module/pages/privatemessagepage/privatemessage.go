@@ -60,3 +60,90 @@ func GetUsers(user_id string) []structure.UserData {
 	}
 	return users
 }
+
+func ProvideMessages(userData structure.UserMessageData, messageCounter int) ([]structure.PrivateMessages){
+	var userID string
+	var otherUserID string
+	// Open a connection to the SQLite database
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT id FROM users WHERE user_id = ?", userData.UserID)
+	err = row.Scan(&userID)
+	if err != nil {
+		log.Println("Error retrieving user UUID:", err)
+	}
+
+	row = db.QueryRow("SELECT id FROM users WHERE nickname = ?", userData.Nickname)
+	err = row.Scan(&otherUserID)
+	if err != nil {
+		log.Println("Error retrieving user nickname:", err)
+	}
+
+	var messages []structure.PrivateMessages
+	query := `
+		SELECT content, timestamp, sender_id, receiver_id
+		FROM messages
+		WHERE (sender_id = ? AND receiver_id = ?)
+		   OR (sender_id = ? AND receiver_id = ?)
+		ORDER BY timestamp
+	`
+	if (messageCounter > 0 ){
+		query = `
+		SELECT content, timestamp, sender_id, receiver_id FROM messages 
+		WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) 
+		ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+	}
+	rows, err := db.Query(query, userID, otherUserID, otherUserID, userID, messageCounter, userData.Offset)
+	if err != nil {
+		log.Println("Invalid UUID")
+		return messages
+	}
+	defer rows.Close()
+
+	log.Println(rows)
+
+	for rows.Next() {
+		var message structure.PrivateMessages
+		err := rows.Scan(&message.Content, &message.Time, &message.SenderId, &message.RecipientId)
+		if err != nil {
+			log.Println("Invalid UUID")
+		}
+		messages = append(messages, message)
+	}
+	if err = rows.Err(); err != nil {
+		log.Println("Invalid UUID")
+	}
+	log.Println("Show message", messages)
+	return messages
+}
+
+func SendMessageToUser(privateMessage  structure.PrivateMesssageSend){
+	var userID string
+	var otherUserID string
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	row := db.QueryRow("SELECT id FROM users WHERE user_id = ?", privateMessage.UserID)
+	err = row.Scan(&userID)
+	if err != nil {
+		log.Println("Error retrieving user UUID:", err)
+	}
+	row = db.QueryRow("SELECT id FROM users WHERE nickname = ?", privateMessage.Nickname)
+	err = row.Scan(&otherUserID)
+	if err != nil {
+		log.Println("Error retrieving user nickname:", err)
+	}
+	_, err = db.Exec("INSERT INTO messages (content, sender_id, recipient_id) VALUES (?, ?, ?)",
+		privateMessage.Content, userID, otherUserID)
+	if err != nil {
+		log.Println("Error inserting user into database:", err)
+	}
+	
+	log.Println("Message send:", privateMessage.Content)
+}

@@ -99,10 +99,7 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 			case "log_out":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
-				pageData := structure.Message{
-					UUID: message.UUID,
-				}
-				delete(onlineUsers, uuid)
+				delete(onlineUsers, message.UUID)
 			case "addUserToConnection":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -171,12 +168,44 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 			case "user_uuid":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
-				userUUIDData := structure.Message{
-					UUID: message.UUID,
-				}
+				sendMessage(conn, message.UUID)
 			case "showmessage":
-				
-				sendMessage(conn, userUUIDData.UUID)
+				var message structure.UserMessageData
+				err = json.Unmarshal(msg, &message)
+				// Convert the local RegistrationData struct to module.RegistrationData
+				retriveMessageData := structure.UserMessageData{
+					UserID:   message.UserID,
+					Nickname: message.Nickname,
+					Offset:   message.Offset,
+				}
+				messages := privatemessage.ProvideMessages(retriveMessageData, 10)
+				privateMessages := make([]structure.PrivateMessages, len(messages))
+				for i, message := range messages {
+					var userID string
+					// Open a connection to the SQLite database
+					db, err := sql.Open("sqlite3", "./forum.db")
+					if err != nil {
+						log.Println(err)
+					}
+					defer db.Close()
+					row := db.QueryRow("SELECT user_id FROM users WHERE nickname = ?", message.SenderId)
+					row.Scan(&userID)
+					privateMessages[i] = structure.PrivateMessages{
+						Content:  message.Content,
+						Time:     message.Time,
+						SenderId: userID,
+					}
+				}
+				sendPrivateMessages(conn, privateMessages)
+			case "sendPrivateMessage":
+				var message structure.PrivateMesssageSend
+				err = json.Unmarshal(msg, &message)
+				messageData := structure.PrivateMesssageSend{
+					UserID:   message.UserID,
+					Nickname: message.Nickname,
+					Content:  message.Content,
+				}
+				privatemessage.SendMessageToUser(messageData)
 			case "cabinet":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -242,6 +271,14 @@ func sendUsersData(conn *websocket.Conn, message []structure.UserData) {
 
 // Function to send a message back to the sender
 func sendPosts(conn *websocket.Conn, message []structure.Post) {
+	fmt.Println(message)
+	err := conn.WriteJSON(message)
+	if err != nil {
+		log.Println("Failed to send message:", err)
+	}
+}
+
+func sendPrivateMessages(conn *websocket.Conn, message []structure.PrivateMessages) {
 	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {
