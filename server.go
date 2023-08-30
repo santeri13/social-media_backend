@@ -151,13 +151,13 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				pageData := structure.Message{
 					UUID: message.UUID,
 				}
-
-				log.Println(pageData)
 				// Get the list of users from the database
 				users := privatemessage.GetUsers(pageData.UUID)
+
 				// Iterate through the list of users and check if they are online
 				for i := range users {
-					if _, ok := onlineUsers[users[i].UserID]; ok {
+					fmt.Println(users[i].UUID)
+					if _, ok := onlineUsers[users[i].UUID]; ok {
 						users[i].Activity = "online"
 					} else {
 						users[i].Activity = "offline"
@@ -239,8 +239,6 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				sendUserData(conn, userData)
 		}
-		log.Println(onlineUsers)
-		log.Println(clients)
     }
 }
 
@@ -253,7 +251,6 @@ func sendMessage(conn *websocket.Conn, message string) {
 }
 
 func sendUserData(conn *websocket.Conn, message structure.UserData) {
-	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)
@@ -261,7 +258,6 @@ func sendUserData(conn *websocket.Conn, message structure.UserData) {
 }
 
 func sendUsersData(conn *websocket.Conn, message []structure.UserData) {
-	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)
@@ -271,7 +267,6 @@ func sendUsersData(conn *websocket.Conn, message []structure.UserData) {
 
 // Function to send a message back to the sender
 func sendPosts(conn *websocket.Conn, message []structure.Post) {
-	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)
@@ -279,7 +274,6 @@ func sendPosts(conn *websocket.Conn, message []structure.Post) {
 }
 
 func sendPrivateMessages(conn *websocket.Conn, message []structure.PrivateMessages) {
-	fmt.Println(message)
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)

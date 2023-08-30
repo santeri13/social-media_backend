@@ -30,7 +30,7 @@ func GetUsers(user_id string) []structure.UserData {
 		log.Fatal("Check if record exists ",err)
 	}
 	if hasRecord {
-		rows, err := db.Query("SELECT id, nickname, user_id FROM users WHERE user_id != ? ORDER BY (SELECT MAX(created_at) FROM chat_messages WHERE sender_id = users.id OR receiver_id = users.id) DESC", user_id)
+		rows, err := db.Query("SELECT id, nickname, user_id FROM users WHERE user_id != ? ORDER BY (SELECT MAX(timestamp) FROM chat_messages WHERE sender_id = users.id OR receiver_id = users.id) DESC", user_id)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -85,21 +85,21 @@ func ProvideMessages(userData structure.UserMessageData, messageCounter int) ([]
 
 	var messages []structure.PrivateMessages
 	query := `
-		SELECT content, timestamp, sender_id, receiver_id
-		FROM messages
+		SELECT message, timestamp, sender_id, receiver_id
+		FROM chat_messages
 		WHERE (sender_id = ? AND receiver_id = ?)
 		   OR (sender_id = ? AND receiver_id = ?)
 		ORDER BY timestamp
 	`
 	if (messageCounter > 0 ){
 		query = `
-		SELECT content, timestamp, sender_id, receiver_id FROM messages 
+		SELECT message, timestamp, sender_id, receiver_id FROM chat_messages 
 		WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) 
 		ORDER BY timestamp DESC LIMIT ? OFFSET ?`
 	}
 	rows, err := db.Query(query, userID, otherUserID, otherUserID, userID, messageCounter, userData.Offset)
 	if err != nil {
-		log.Println("Invalid UUID")
+		log.Println("Error retriveing messages", err)
 		return messages
 	}
 	defer rows.Close()
@@ -139,11 +139,12 @@ func SendMessageToUser(privateMessage  structure.PrivateMesssageSend){
 	if err != nil {
 		log.Println("Error retrieving user nickname:", err)
 	}
-	_, err = db.Exec("INSERT INTO messages (content, sender_id, recipient_id) VALUES (?, ?, ?)",
+	_, err = db.Exec("INSERT INTO chat_messages (message, sender_id, receiver_id) VALUES (?, ?, ?)",
 		privateMessage.Content, userID, otherUserID)
 	if err != nil {
 		log.Println("Error inserting user into database:", err)
 	}
+	
 	
 	log.Println("Message send:", privateMessage.Content)
 }
