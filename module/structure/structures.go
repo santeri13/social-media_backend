@@ -9,6 +9,8 @@ type RegistrationData struct {
 	Gender    string `json: "gender"`
 	Email     string `json: "email"`
 	Password  string `json: "password"`
+	Avatar	  string `json:"avatar"`
+	About     string `json:"about_me"`
 }
 
 type LoginData struct {
@@ -27,7 +29,8 @@ type Post struct {
 	Title    string    
 	Content  string   
 	Category string    
-	Nickname string		
+	Nickname string
+	ImagePath string
 	Comments []Comment
 }
 
@@ -49,7 +52,8 @@ type UserData struct {
     Gender    string `json: "gender"`
     Email     string `json: "email"`
 	Activity  string `json:"activity"`
-
+	Avatar	  string `json:"avatar"`
+	About     string `json:"about_me"`
 }
 
 type PrivateMessages struct {

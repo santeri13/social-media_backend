@@ -29,7 +29,7 @@ func PostCreation(postData structure.Post) {
 	}
 
 	// Insert the user into the database
-	_, err = db.Exec("INSERT INTO posts (title, content, category, user_id) VALUES (?, ?, ?, ?)", postData.Title, postData.Content, postData.Category, userID)
+	_, err = db.Exec("INSERT INTO posts (title, content, category, user_id, image) VALUES (?, ?, ?, ?, ?)", postData.Title, postData.Content, postData.Category, userID, postData.ImagePath)
 
 	if err != nil {
 		log.Println("Error inserting post into database:", err)
@@ -72,7 +72,7 @@ func GetPostsFromDatabase() []structure.Post {
 	defer db.Close()
 	// Retrieve all posts from the database
 	rows, err := db.Query(`
-		SELECT p.id, p.user_id, p.title, p.content, p.category, c.id, c.author_id, c.content
+		SELECT p.id, p.user_id, p.title, p.content, p.category, p.image , c.id, c.author_id, c.content
 		FROM posts p
 		LEFT JOIN comments c ON c.post_id = p.id ORDER BY p.id
 	`)
@@ -85,8 +85,8 @@ func GetPostsFromDatabase() []structure.Post {
 	// Iterate over the rows and populate the postsMap
 	for rows.Next() {
 		var postID, commentID int
-		var postUserID, postTitle, postContent, postCategory, commentUserID, commentContent, postUserNickname, commentUserNickname string
-		err := rows.Scan(&postID, &postUserID, &postTitle, &postContent, &postCategory, &commentID, &commentUserID, &commentContent)
+		var postUserID, postTitle, postContent, postCategory, postImagePath, commentUserID, commentContent, postUserNickname, commentUserNickname string
+		err := rows.Scan(&postID, &postUserID, &postTitle, &postContent, &postCategory, &postImagePath, &commentID, &commentUserID, &commentContent)
 		if err != nil {
 			log.Println(err)
 		}
@@ -109,6 +109,7 @@ func GetPostsFromDatabase() []structure.Post {
 				Content:  postContent,
 				Category: postCategory,
 				Nickname: postUserNickname,
+				ImagePath: postImagePath,
 			}
 			postsMap[postID] = post
 		}

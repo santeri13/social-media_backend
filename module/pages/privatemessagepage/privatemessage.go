@@ -61,7 +61,7 @@ func GetUsers(user_id string) []structure.UserData {
 	return users
 }
 
-func ProvideMessages(userData structure.UserMessageData, messageCounter int) ([]structure.PrivateMessages){
+func ProvideMessages(userData structure.UserMessageData) ([]structure.PrivateMessages){
 	var userID string
 	var otherUserID string
 	// Open a connection to the SQLite database
@@ -85,19 +85,10 @@ func ProvideMessages(userData structure.UserMessageData, messageCounter int) ([]
 
 	var messages []structure.PrivateMessages
 	query := `
-		SELECT message, timestamp, sender_id, receiver_id
-		FROM chat_messages
-		WHERE (sender_id = ? AND receiver_id = ?)
-		   OR (sender_id = ? AND receiver_id = ?)
-		ORDER BY timestamp
-	`
-	if (messageCounter > 0 ){
-		query = `
-		SELECT message, timestamp, sender_id, receiver_id FROM chat_messages 
-		WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) 
-		ORDER BY timestamp DESC LIMIT ? OFFSET ?`
-	}
-	rows, err := db.Query(query, userID, otherUserID, otherUserID, userID, messageCounter, userData.Offset)
+	SELECT message, timestamp, sender_id, receiver_id FROM chat_messages 
+	WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) 
+	ORDER BY timestamp DESC`
+	rows, err := db.Query(query, userID, otherUserID, otherUserID, userID)
 	if err != nil {
 		log.Println("Error retriveing messages", err)
 		return messages

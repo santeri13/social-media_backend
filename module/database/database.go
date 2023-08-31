@@ -207,9 +207,9 @@ func RegisterUser(registrationData structure.RegistrationData) (string){
 	}
 
 	// Insert the user into the database
-	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password, avatar, about_me) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		userID.String(), registrationData.Nickname, registrationData.FirstName, registrationData.LastName,
-		registrationData.Age, registrationData.Gender, registrationData.Email, hashedPassword)
+		registrationData.Age, registrationData.Gender, registrationData.Email, hashedPassword, registrationData.Avatar, registrationData.About)
 	if err != nil {
 		log.Println("Error inserting user into database:", err)
 		return ""

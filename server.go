@@ -6,6 +6,11 @@ import (
 	"log"
 	"net/http"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"io"
+	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -90,6 +95,8 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Gender:    	message.Gender,
 					Email:     	message.Email, 
 					Password:  	message.Password,
+					Avatar: 	message.Avatar,
+					About:		message.About,
 				}
 				userID := database.RegisterUser(regData)
 				if userID != "" {
@@ -117,8 +124,8 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Title:		message.Title,
 					Content:  	message.Content,
 					Category:   message.Category,
+					ImagePath:	message.ImagePath,
 				}
-				log.Println(post)
 				mainpage.PostCreation(post)
 			case "comment":
 				var message structure.Comment
@@ -128,7 +135,6 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Content:	message.Content,
 					PostID:  	message.PostID,
 				}
-				log.Println(comment)
 				mainpage.CommentCreation(comment)
 			case "posts":
 				sendPosts(conn,mainpage.GetPostsFromDatabase())
@@ -142,7 +148,9 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					LastName:  	message.LastName,
 					Age:      	message.Age, 
 					Gender:    	message.Gender,
-					Email:     	message.Email, 
+					Email:     	message.Email,
+					Avatar: 	message.Avatar,
+					About:		message.About,
 				}
 				cabinetpage.UpdateUserData(userData)
 			case "userlist":
@@ -178,7 +186,7 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Nickname: message.Nickname,
 					Offset:   message.Offset,
 				}
-				messages := privatemessage.ProvideMessages(retriveMessageData, 10)
+				messages := privatemessage.ProvideMessages(retriveMessageData)
 				privateMessages := make([]structure.PrivateMessages, len(messages))
 				for i, message := range messages {
 					var userID string
@@ -223,9 +231,11 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				var first_name string
 				var last_name string
 				var email string
+				var avatar string
+				var about_me string
 				// Retrieve the hashed password from the database based on the provided email
-				row := db.QueryRow("SELECT nickname, age, gender, first_name, last_name, email FROM users WHERE user_id = ?", pageData.UUID)
-				err = row.Scan(&nickname, &age, &gender, &first_name, &last_name, &email)
+				row := db.QueryRow("SELECT nickname, age, gender, first_name, last_name, email, avatar, about_me FROM users WHERE user_id = ?", pageData.UUID)
+				err = row.Scan(&nickname, &age, &gender, &first_name, &last_name, &email, &avatar, &about_me)
 				if err != nil {
 					log.Println("Error retrieving user UUID:", err)
 				}
@@ -236,6 +246,8 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 						Age:       age,
 						Gender:    gender,
 						Email:     email,
+						Avatar:	   avatar,
+						About: 	   about_me,
 				}
 				sendUserData(conn, userData)
 		}
@@ -292,6 +304,50 @@ func broadcastMessage(sender *websocket.Conn, message string) {
 	}
 }
 
+func handleImageUpload(w http.ResponseWriter, r *http.Request) {
+	// Parse the form data, including the uploaded file
+	err := r.ParseMultipartForm(10 << 20) // Max size: 10MB
+	if err != nil {
+		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Generate a unique filename for the uploaded image
+	filename := generateUniqueFileName(handler.Filename)
+	
+	// Save the file to the server
+	dst, err := os.Create(filepath.Join("uploaded_images", filename))
+	if err != nil {
+		http.Error(w, "Error saving the file", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	// Copy the uploaded file content to the destination
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(w, "Error copying file content", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the image path
+	imagePath := "/uploaded_images/" + filename
+	w.Write([]byte(imagePath))
+}
+
+func generateUniqueFileName(filename string) string {
+	ext := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, ext)
+	return fmt.Sprintf("%s-%d%s", base, time.Now().UnixNano(), ext)
+}
+
 func main() {
     db, err := sql.Open("sqlite3", "./forum.db")
 	if err != nil {
@@ -302,9 +358,11 @@ func main() {
 	database.CreateTables(db)
 
 	http.HandleFunc("/websocket", handleWebSocketConnection)
+	http.HandleFunc("/upload", handleImageUpload)
 
 	// Serve the frontend files
 	http.Handle("/", http.FileServer(http.Dir("./frontend/dist")))
+	http.Handle("/uploaded_images/", http.StripPrefix("/uploaded_images/", http.FileServer(http.Dir("uploaded_images"))))
 
 	fmt.Println("WebSocket server started. Listening on port 8080...")
 	err = http.ListenAndServe(":8080", nil)
