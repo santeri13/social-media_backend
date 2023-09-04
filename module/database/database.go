@@ -30,7 +30,8 @@ func CreateTables(db *sql.DB) error {
 			gender TEXT NOT NULL,
 			avatar TEXT,
 			nickname TEXT,
-			about_me TEXT
+			about_me TEXT,
+			privacy TEXT
 		)
 	`)
 	if err != nil {
@@ -164,16 +165,15 @@ func LoginUser(loginData structure.LoginData) (string) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// No user found with the provided email
-			return "Invalid email or password"
+			log.Println("Invalid email or password")
 		}
 		log.Println("Error retrieving user:", err)
-		return "Error retrieving user"
 	}
 	// Compare the provided password with the hashed password
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginData.Password))
 	if err != nil {
 		// Password does not match
-		return "Invalid email or password"
+		log.Println("Invalid email or password")
 	}
 	return userID
 }
@@ -207,9 +207,9 @@ func RegisterUser(registrationData structure.RegistrationData) (string){
 	}
 
 	// Insert the user into the database
-	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password, avatar, about_me) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password, avatar, about_me, privacy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		userID.String(), registrationData.Nickname, registrationData.FirstName, registrationData.LastName,
-		registrationData.Age, registrationData.Gender, registrationData.Email, hashedPassword, registrationData.Avatar, registrationData.About)
+		registrationData.Age, registrationData.Gender, registrationData.Email, hashedPassword, registrationData.Avatar, registrationData.About, "public")
 	if err != nil {
 		log.Println("Error inserting user into database:", err)
 		return ""

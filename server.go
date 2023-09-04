@@ -19,6 +19,7 @@ import (
 	"social-network/module/pages/mainpage"
 	"social-network/module/pages/cabinetpage"
 	"social-network/module/pages/privatemessagepage"
+	"social-network/module/pages/userpage"
 )
 
 var clients = make(map[*websocket.Conn]bool)
@@ -138,6 +139,14 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				mainpage.CommentCreation(comment)
 			case "posts":
 				sendPosts(conn,mainpage.GetPostsFromDatabase())
+			case "user_posts":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				userData := structure.Message{
+					UUID: message.UUID,
+				}
+				log.Println(userData.UUID)
+				sendPosts(conn,userpage.UserPosts(userData.UUID))
 			case "change":
 				var message structure.UserData
 				err = json.Unmarshal(msg, &message)
@@ -151,6 +160,7 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Email:     	message.Email,
 					Avatar: 	message.Avatar,
 					About:		message.About,
+					Privacy:	message.Privacy,
 				}
 				cabinetpage.UpdateUserData(userData)
 			case "userlist":
@@ -214,6 +224,14 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Content:  message.Content,
 				}
 				privatemessage.SendMessageToUser(messageData)
+			case "followUser":
+				var message structure.UserData
+				err = json.Unmarshal(msg, &message)
+				userData := structure.UserData{
+					UserID: message.UserID,
+					UUID:	message.UUID,
+				}
+				userpage.FollowUser(userData)
 			case "cabinet":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -233,21 +251,24 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				var email string
 				var avatar string
 				var about_me string
+				var privacy string
 				// Retrieve the hashed password from the database based on the provided email
-				row := db.QueryRow("SELECT nickname, age, gender, first_name, last_name, email, avatar, about_me FROM users WHERE user_id = ?", pageData.UUID)
-				err = row.Scan(&nickname, &age, &gender, &first_name, &last_name, &email, &avatar, &about_me)
+				row := db.QueryRow("SELECT nickname, age, gender, first_name, last_name, email, privacy, avatar, about_me FROM users WHERE user_id = ?", pageData.UUID)
+				err = row.Scan(&nickname, &age, &gender, &first_name, &last_name, &email, &privacy, &avatar, &about_me)
 				if err != nil {
 					log.Println("Error retrieving user UUID:", err)
 				}
 				userData:= structure.UserData{
+						UserID:    pageData.UUID,
 						Nickname:  nickname,
 						FirstName: first_name,
 						LastName:  last_name,
 						Age:       age,
 						Gender:    gender,
 						Email:     email,
-						Avatar:	   avatar,
-						About: 	   about_me,
+						Avatar:    avatar,
+						About:	   about_me,
+						Privacy:   privacy,
 				}
 				sendUserData(conn, userData)
 		}

@@ -54,6 +54,7 @@ type UserData struct {
 	Activity  string `json:"activity"`
 	Avatar	  string `json:"avatar"`
 	About     string `json:"about_me"`
+	Privacy	  string `json:"privacy"`
 }
 
 type PrivateMessages struct {
