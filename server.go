@@ -20,6 +20,7 @@ import (
 	"social-network/module/pages/cabinetpage"
 	"social-network/module/pages/privatemessagepage"
 	"social-network/module/pages/userpage"
+	"social-network/module/pages/grouppage"
 )
 
 var clients = make(map[*websocket.Conn]bool)
@@ -232,6 +233,24 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					UUID:	message.UUID,
 				}
 				userpage.FollowUser(userData)
+			case "user_folowers":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				userData := structure.Message{
+					UUID:	message.UUID,
+				}
+				sendUsersData(conn, userpage.Followers(userData))
+			case "createGroup":
+				var message structure.Group
+				err = json.Unmarshal(msg, &message)
+				groupInfromation := structure.Group{
+					UUID:			message.UUID,
+					Name:			message.Name,
+					Description:	message.Description,
+				}
+				grouppage.CreateGroup(groupInfromation)
+			case "get_groups":
+				sendGroupsMessages(conn,grouppage.GetGroups())
 			case "cabinet":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -307,6 +326,13 @@ func sendPosts(conn *websocket.Conn, message []structure.Post) {
 }
 
 func sendPrivateMessages(conn *websocket.Conn, message []structure.PrivateMessages) {
+	err := conn.WriteJSON(message)
+	if err != nil {
+		log.Println("Failed to send message:", err)
+	}
+}
+
+func sendGroupsMessages(conn *websocket.Conn, message []structure.Group) {
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)

@@ -75,3 +75,9 @@ type UserMessageData struct {
 	Nickname string
 	Offset   int
 }
+
+type Group struct{
+	UUID		string
+	Name		string
+	Description	string
+}

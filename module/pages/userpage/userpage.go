@@ -97,3 +97,39 @@ func FollowUser(followUser structure.UserData){
 		log.Println("User", follower_id,"delete follow",following_id)
 	}
 }
+
+func Followers(userData structure.Message) []structure.UserData{
+	var following_id string
+	var users []structure.UserData
+	
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT id FROM users WHERE user_id = ? OR id = ?", userData.UUID, userData.UUID)
+	err = row.Scan(&following_id)
+
+	rows, err:= db.Query(`
+		SELECT users.id, users.nickname
+		FROM users
+		INNER JOIN followers ON users.id = followers.follower_id
+		WHERE followers.following_id = ?
+	`, following_id)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var user structure.UserData
+		err := rows.Scan(&user.UserID, &user.Nickname)
+		if err != nil {
+			log.Fatal(err)
+		}
+		users = append(users, user)
+	}
+	return users
+}
