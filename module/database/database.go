@@ -120,7 +120,8 @@ func CreateTables(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS chat_messages (
 			id INTEGER PRIMARY KEY,
 			sender_id INTEGER NOT NULL,
-			receiver_id INTEGER NOT NULL,
+			receiver_id INTEGER,
+			group_id INTEGER,
 			message TEXT NOT NULL,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
@@ -137,6 +138,7 @@ func CreateTables(db *sql.DB) error {
 			id INTEGER PRIMARY KEY,
 			user_id INTEGER NOT NULL,
 			type TEXT NOT NULL,
+			information TEXT NOT NULL,
 			message TEXT NOT NULL,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 			is_read INTEGER NOT NULL DEFAULT 0,
@@ -165,7 +167,7 @@ func LoginUser(loginData structure.LoginData) (string) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// No user found with the provided email
-			log.Println("Invalid email or password")
+			return "Invalid email or password"
 		}
 		log.Println("Error retrieving user:", err)
 	}
@@ -173,7 +175,7 @@ func LoginUser(loginData structure.LoginData) (string) {
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginData.Password))
 	if err != nil {
 		// Password does not match
-		log.Println("Invalid email or password")
+		return "Invalid email or password"
 	}
 	return userID
 }
@@ -207,7 +209,7 @@ func RegisterUser(registrationData structure.RegistrationData) (string){
 	}
 
 	// Insert the user into the database
-	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password, avatar, about_me, privacy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err = db.Exec("INSERT INTO users (user_id, nickname, first_name, last_name, age, gender, email, password, avatar, about_me, privacy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		userID.String(), registrationData.Nickname, registrationData.FirstName, registrationData.LastName,
 		registrationData.Age, registrationData.Gender, registrationData.Email, hashedPassword, registrationData.Avatar, registrationData.About, "public")
 	if err != nil {

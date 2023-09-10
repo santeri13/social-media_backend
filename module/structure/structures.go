@@ -21,6 +21,7 @@ type LoginData struct {
 type Message struct {
 	Type 	string `json:"type"`
 	UUID 	string `json:"uuid"`
+	Page 	string `json:"page"`
 }
 
 type Post struct {
@@ -80,4 +81,13 @@ type Group struct{
 	UUID		string
 	Name		string
 	Description	string
+}
+
+type Notification struct{
+	ID			int
+	Type		string
+	UUID		string
+	Information string
+	Message		string
+	Time		string
 }

@@ -155,3 +155,76 @@ func (e employeeList) Less(i, j int) bool {
 func (e employeeList) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
+
+func GetNotifications(UUID string) []structure.Notification {
+	var notifications []structure.Notification
+	// Open a connection to the SQLite database
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
+
+	// Retrieve all posts from the database
+	rows, err := db.Query(`SELECT id, type, information, message, timestamp FROM notifications WHERE user_id = ? AND is_read = 0`, UUID)
+	if err != nil {
+		log.Println("Error retriveing notifications", err)
+	}
+
+	for rows.Next() {
+		var notification structure.Notification
+		err := rows.Scan(&notification.ID ,&notification.Type, &notification.Information, &notification.Message, &notification.Time)
+		if err != nil {
+			log.Println("Wrong in retriving notifications")
+		}
+		notifications = append(notifications, notification)
+	}
+	_, err = db.Exec("UPDATE notifications SET is_read = 1")
+	if err != nil {
+		log.Println("Error changing is_read in notifications:", err)
+	}
+	log.Println("Show notifications", notifications)
+	return notifications
+}
+
+func DeleteNotification(id int){
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec("DELETE FROM notifications WHERE id = ", id)
+	if err != nil {
+		log.Println("Error deleteing notification:", err)
+	}
+
+	log.Println("Notification deleted")
+}
+
+func CreateNotification(userData structure.Notification){
+	var message string
+	db, err := sql.Open("sqlite3", "./forum.db")
+	if err != nil {
+		log.Println(err)
+	}
+	defer db.Close()
+
+	if (userData.Type == "follow"){
+		row := db.QueryRow("SELECT username FROM users WHERE user_id = ? OR id = ?", userData.UUID, userData.UUID)
+		err = row.Scan(&message)
+		if err != nil {
+			log.Fatal("Retrive UUID to check",err)
+		}
+		message = "User "+message+" like to follow you"
+	}else if (userData.Type == "group"){
+		message = "Invitation to group "+message
+	}
+
+	_, err = db.Exec("INSERT INTO notifications (user_id, type, message, is_read, information) VALUES (?, ?, ?, ?, ?)",  userData.UUID, userData.Type, message, 0, userData.Information)
+	if err != nil {
+		log.Println("Error inserting group member into database:", err)
+	}
+
+	log.Println("Notification created")
+}

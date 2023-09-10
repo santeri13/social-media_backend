@@ -148,22 +148,6 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				log.Println(userData.UUID)
 				sendPosts(conn,userpage.UserPosts(userData.UUID))
-			case "change":
-				var message structure.UserData
-				err = json.Unmarshal(msg, &message)
-				userData:= structure.UserData{
-					UserID:		message.UserID,
-					Nickname:	message.Nickname,
-					FirstName:	message.FirstName,
-					LastName:  	message.LastName,
-					Age:      	message.Age, 
-					Gender:    	message.Gender,
-					Email:     	message.Email,
-					Avatar: 	message.Avatar,
-					About:		message.About,
-					Privacy:	message.Privacy,
-				}
-				cabinetpage.UpdateUserData(userData)
 			case "userlist":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -184,6 +168,46 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				
 				sendUsersData(conn, users)
+			case "notificationlist":
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				pageData := structure.Message{
+					UUID: message.UUID,
+				}
+				notifications := mainpage.GetNotifications(pageData.UUID)
+				sendNotifications(conn, notifications)
+			case "deleteNotification":
+				var message structure.Notification
+				err = json.Unmarshal(msg, &message)
+				notificationInfromation := structure.Notification{
+					ID:	message.ID,
+				}
+				mainpage.DeleteNotification(notificationInfromation.ID)
+			case "sendNotification":
+				var message structure.Notification
+				err = json.Unmarshal(msg, &message)
+				userData := structure.Notification{
+					Type: 			message.Type,
+					UUID:			message.UUID,
+					Information:	message.Information,
+				}
+				mainpage.CreateNotification(userData)
+			case "change":
+				var message structure.UserData
+				err = json.Unmarshal(msg, &message)
+				userData:= structure.UserData{
+					UserID:		message.UserID,
+					Nickname:	message.Nickname,
+					FirstName:	message.FirstName,
+					LastName:  	message.LastName,
+					Age:      	message.Age, 
+					Gender:    	message.Gender,
+					Email:     	message.Email,
+					Avatar: 	message.Avatar,
+					About:		message.About,
+					Privacy:	message.Privacy,
+				}
+				cabinetpage.UpdateUserData(userData)
 			case "user_uuid":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -216,6 +240,35 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				sendPrivateMessages(conn, privateMessages)
+			case "showgroupmessage":
+				var message structure.UserMessageData
+				err = json.Unmarshal(msg, &message)
+				// Convert the local RegistrationData struct to module.RegistrationData
+				retriveMessageData := structure.UserMessageData{
+					UserID:   message.UserID,
+					Nickname: message.Nickname,
+					Offset:   message.Offset,
+				}
+				messages := privatemessage.ProvideGroupMessages(retriveMessageData)
+
+				privateMessages := make([]structure.PrivateMessages, len(messages))
+				for i, message := range messages {
+					var userID string
+					// Open a connection to the SQLite database
+					db, err := sql.Open("sqlite3", "./forum.db")
+					if err != nil {
+						log.Println(err)
+					}
+					defer db.Close()
+					row := db.QueryRow("SELECT user_id FROM users WHERE nickname = ?", message.SenderId)
+					row.Scan(&userID)
+					privateMessages[i] = structure.PrivateMessages{
+						Content:  message.Content,
+						Time:     message.Time,
+						SenderId: userID,
+					}
+				}
+				sendPrivateMessages(conn, privateMessages)
 			case "sendPrivateMessage":
 				var message structure.PrivateMesssageSend
 				err = json.Unmarshal(msg, &message)
@@ -225,6 +278,15 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Content:  message.Content,
 				}
 				privatemessage.SendMessageToUser(messageData)
+			case "sendGroupMessage":
+				var message structure.PrivateMesssageSend
+				err = json.Unmarshal(msg, &message)
+				messageData := structure.PrivateMesssageSend{
+					UserID:   message.UserID,
+					Nickname: message.Nickname,
+					Content:  message.Content,
+				}
+				privatemessage.SendMessageToGroup(messageData)
 			case "followUser":
 				var message structure.UserData
 				err = json.Unmarshal(msg, &message)
@@ -250,7 +312,22 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				grouppage.CreateGroup(groupInfromation)
 			case "get_groups":
-				sendGroupsMessages(conn,grouppage.GetGroups())
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				groupInfromation := structure.Message{
+					UUID:			message.UUID,
+					Page:			message.Page,
+				}
+				sendGroupsMessages(conn,grouppage.GetGroups(groupInfromation))
+			case "addToGroup":
+				var message structure.Group
+				err = json.Unmarshal(msg, &message)
+				groupInfromation := structure.Group{
+					UUID:			message.UUID,
+					Name:			message.Name,
+					Description:	message.Description,
+				}
+				grouppage.InsertUser(groupInfromation.Name, groupInfromation.Description)
 			case "cabinet":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -333,6 +410,13 @@ func sendPrivateMessages(conn *websocket.Conn, message []structure.PrivateMessag
 }
 
 func sendGroupsMessages(conn *websocket.Conn, message []structure.Group) {
+	err := conn.WriteJSON(message)
+	if err != nil {
+		log.Println("Failed to send message:", err)
+	}
+}
+
+func sendNotifications(conn *websocket.Conn, message []structure.Notification) {
 	err := conn.WriteJSON(message)
 	if err != nil {
 		log.Println("Failed to send message:", err)
