@@ -26,11 +26,12 @@ type Message struct {
 
 type Post struct {
 	ID       int       
-	UserID   string    
+	UserID   int    
 	Title    string    
 	Content  string   
 	Category string    
 	Nickname string
+	Privacy  string
 	ImagePath string
 	Comments []Comment
 }

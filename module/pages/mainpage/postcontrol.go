@@ -29,7 +29,7 @@ func PostCreation(postData structure.Post) {
 	}
 
 	// Insert the user into the database
-	_, err = db.Exec("INSERT INTO posts (title, content, category, user_id, image) VALUES (?, ?, ?, ?, ?)", postData.Title, postData.Content, postData.Category, userID, postData.ImagePath)
+	_, err = db.Exec("INSERT INTO posts (title, content, category, user_id, image, privacy) VALUES (?, ?, ?, ?, ?, ?)", postData.Title, postData.Content, postData.Category, userID, postData.ImagePath, postData.Privacy)
 
 	if err != nil {
 		log.Println("Error inserting post into database:", err)
@@ -63,30 +63,41 @@ func CommentCreation(commentData structure.Comment) {
 	log.Println("Comment is created:", commentData.Content)
 }
 
-func GetPostsFromDatabase() []structure.Post {
+func GetPostsFromDatabase(pageData structure.Message) []structure.Post {
+	var userID int
 	// Open a connection to the SQLite database
 	db, err := sql.Open("sqlite3", "./forum.db")
 	if err != nil {
 		log.Println(err)
 	}
 	defer db.Close()
+
+	row := db.QueryRow("SELECT id FROM users WHERE user_id = ?", pageData.UUID)
+	err = row.Scan(&userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Println( err)
+		}
+		log.Println("Error retrieving user id:", err)
+	}
+
 	// Retrieve all posts from the database
 	rows, err := db.Query(`
-		SELECT p.id, p.user_id, p.title, p.content, p.category, p.image , c.id, c.author_id, c.content
+		SELECT p.id, p.user_id, p.title, p.content, p.category, p.image, p.privacy , c.id, c.author_id, c.content
 		FROM posts p
 		LEFT JOIN comments c ON c.post_id = p.id ORDER BY p.id
 	`)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error in retriving post with comments:",err)
 	}
 	defer rows.Close()
 	// Map to store posts and their comments
 	postsMap := make(map[int]*structure.Post)
 	// Iterate over the rows and populate the postsMap
 	for rows.Next() {
-		var postID, commentID int
-		var postUserID, postTitle, postContent, postCategory, postImagePath, commentUserID, commentContent, postUserNickname, commentUserNickname string
-		err := rows.Scan(&postID, &postUserID, &postTitle, &postContent, &postCategory, &postImagePath, &commentID, &commentUserID, &commentContent)
+		var postID, commentID, postUserID int
+		var postTitle, postContent, postCategory, postImagePath, postPrivacy, commentUserID, commentContent, postUserNickname, commentUserNickname string
+		err := rows.Scan(&postID, &postUserID, &postTitle, &postContent, &postCategory, &postImagePath, &postPrivacy, &commentID, &commentUserID, &commentContent)
 		if err != nil {
 			log.Println(err)
 		}
@@ -98,38 +109,103 @@ func GetPostsFromDatabase() []structure.Post {
 			}
 			log.Println("Error retrieving user nickname:", err)
 		}
+
+		id_rows, id_err := db.Query(`SELECT follower_id FROM followers where following_id = ?`, postUserID)
+		if id_err != nil {
+			log.Println(id_err)
+		}
+		defer id_rows.Close()
 		// Check if the post already exists in the map
 		post, ok := postsMap[postID]
-		if !ok {
-			// Create a new post if it doesn't exist
-			post = &structure.Post{
-				ID:       postID,
-				UserID:   postUserID,
-				Title:    postTitle,
-				Content:  postContent,
-				Category: postCategory,
-				Nickname: postUserNickname,
-				ImagePath: postImagePath,
-			}
-			postsMap[postID] = post
+		switch postPrivacy{
+			case "public":
+				if !ok {
+					// Create a new post if it doesn't exist
+					post = &structure.Post{
+						ID:       postID,
+						UserID:   postUserID,
+						Title:    postTitle,
+						Content:  postContent,
+						Category: postCategory,
+						Nickname: postUserNickname,
+						ImagePath: postImagePath,
+					}
+					postsMap[postID] = post
+				}
+				row = db.QueryRow("SELECT nickname FROM users WHERE id = ?", commentUserID)
+				err = row.Scan(&commentUserNickname)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						log.Println( err)
+					}
+					log.Println("Error retrieving user nickname for comments:", err)
+				}
+				// Append the comment to the post's comments slice
+				if commentID != 0 {
+					comment := structure.Comment{
+						ID:      commentID,
+						UserID:  commentUserID,
+						Content: commentContent,
+						Nickname: commentUserNickname,
+					}
+					post.Comments = append(post.Comments, comment)
+				}
+			case "private":
+				var followerUserID int
+				err := rows.Scan(&followerUserID)
+				if err != nil {
+					log.Println(err)
+				}
+				for id_rows.Next() {
+					if (postUserID == userID || userID == followerUserID){
+						if !ok {
+							// Create a new post if it doesn't exist
+							post = &structure.Post{
+								ID:       postID,
+								UserID:   postUserID,
+								Title:    postTitle,
+								Content:  postContent,
+								Category: postCategory,
+								Nickname: postUserNickname,
+								ImagePath: postImagePath,
+							}
+							postsMap[postID] = post
+						}
+						row = db.QueryRow("SELECT nickname FROM users WHERE id = ?", commentUserID)
+						err = row.Scan(&commentUserNickname)
+						if err != nil {
+							if errors.Is(err, sql.ErrNoRows) {
+								log.Println( err)
+							}
+							log.Println("Error retrieving user nickname for comments:", err)
+						}
+						// Append the comment to the post's comments slice
+						if commentID != 0 {
+							comment := structure.Comment{
+								ID:      commentID,
+								UserID:  commentUserID,
+								Content: commentContent,
+								Nickname: commentUserNickname,
+							}
+							post.Comments = append(post.Comments, comment)
+						}
+					}
+				}
+
 		}
-		row = db.QueryRow("SELECT nickname FROM users WHERE id = ?", commentUserID)
-		err = row.Scan(&commentUserNickname)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				log.Println( err)
+		for id_rows.Next() {
+			var followerUserID int
+			err := rows.Scan(&followerUserID)
+			if err != nil {
+				log.Println(err)
 			}
-			log.Println("Error retrieving user nickname for comments:", err)
-		}
-		// Append the comment to the post's comments slice
-		if commentID != 0 {
-			comment := structure.Comment{
-				ID:      commentID,
-				UserID:  commentUserID,
-				Content: commentContent,
-				Nickname: commentUserNickname,
+			log.Println("postPrivacy",postPrivacy)
+			log.Println("postUserID == userID",postUserID == userID)
+			log.Println("userID == followerUserID",userID == followerUserID)
+			log.Println("postPrivacy == private",postPrivacy == "private")
+			log.Println("postPrivacy == public",postPrivacy == "public")
+			if ((postUserID == userID || userID == followerUserID) && postPrivacy == "private" || postPrivacy == "public"){
 			}
-			post.Comments = append(post.Comments, comment)
 		}
 	}
 	// Collect the posts from the map

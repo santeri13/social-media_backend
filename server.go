@@ -126,6 +126,7 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 					Title:		message.Title,
 					Content:  	message.Content,
 					Category:   message.Category,
+					Privacy:	message.Privacy,
 					ImagePath:	message.ImagePath,
 				}
 				mainpage.PostCreation(post)
@@ -139,7 +140,12 @@ func handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
 				}
 				mainpage.CommentCreation(comment)
 			case "posts":
-				sendPosts(conn,mainpage.GetPostsFromDatabase())
+				var message structure.Message
+				err = json.Unmarshal(msg, &message)
+				pageData := structure.Message{
+					UUID: message.UUID,
+				}
+				sendPosts(conn,mainpage.GetPostsFromDatabase(pageData))
 			case "user_posts":
 				var message structure.Message
 				err = json.Unmarshal(msg, &message)
@@ -492,7 +498,7 @@ func main() {
 	http.HandleFunc("/upload", handleImageUpload)
 
 	// Serve the frontend files
-	http.Handle("/", http.FileServer(http.Dir("./frontend/dist")))
+	http.Handle("/", http.FileServer(http.Dir("./social-media-frontend/dist")))
 	http.Handle("/uploaded_images/", http.StripPrefix("/uploaded_images/", http.FileServer(http.Dir("uploaded_images"))))
 
 	fmt.Println("WebSocket server started. Listening on port 8080...")
