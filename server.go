@@ -498,7 +498,7 @@ func main() {
 	http.HandleFunc("/upload", handleImageUpload)
 
 	// Serve the frontend files
-	http.Handle("/", http.FileServer(http.Dir("./social-media-frontend/dist")))
+	http.Handle("/", http.FileServer(http.Dir("../social-media-frontend/dist")))
 	http.Handle("/uploaded_images/", http.StripPrefix("/uploaded_images/", http.FileServer(http.Dir("uploaded_images"))))
 
 	fmt.Println("WebSocket server started. Listening on port 8080...")

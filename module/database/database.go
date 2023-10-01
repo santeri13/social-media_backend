@@ -48,6 +48,7 @@ func CreateTables(db *sql.DB) error {
 			category TEXT NOT NULL,
 			image TEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			privacy TEXT NOT NULL,
 			FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 		)
 	`)
